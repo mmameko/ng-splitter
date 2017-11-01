@@ -10,6 +10,11 @@ export class SplitAreaDirective {
   @Input() set basis(v) {
     this._renderer.setStyle(this.elementRef.nativeElement, 'flexBasis', v);
   }
+  @Input() set minWidth(v) {
+    this._renderer.setStyle(this.elementRef.nativeElement, 'minWidth', `${v}px`);
+  }
+
+  @HostBinding('style.overflow') private overflow = 'auto';
   @HostBinding('class') private wrapperCls = 'split-area';
 
   constructor(public elementRef: ElementRef,

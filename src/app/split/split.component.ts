@@ -1,5 +1,5 @@
 import {
-  Component, Input, ContentChildren,
+  Component, Input, ContentChildren, ChangeDetectionStrategy,
   AfterContentInit, ViewEncapsulation, ViewChildren, AfterViewInit, ViewContainerRef, ViewChild, Renderer2
 } from '@angular/core';
 
@@ -12,10 +12,12 @@ type Direction = 'horizontal' | 'vertical';
   selector: 'split',
   styleUrls: ['./split.component.css'],
   encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<div #container class="splitter" [ngClass]="direction">
     <ng-content></ng-content>
     <ng-template ngFor let-area [ngForOf]="areas" let-last="last" let-i="index">
       <div splitter
+           draggable="false"
            [dir]="direction"
            [size]="splitSize"
            [style.order]="i*2+1"
@@ -27,6 +29,7 @@ type Direction = 'horizontal' | 'vertical';
 export class SplitComponent implements AfterViewInit, AfterContentInit {
   @Input() direction: Direction = 'horizontal';
   @Input() splitSize = 11;
+  @Input() minSize = 100;
 
   @ViewChild('container') container;
   @ContentChildren(SplitAreaDirective) areas;
@@ -45,22 +48,24 @@ export class SplitComponent implements AfterViewInit, AfterContentInit {
     const aCount = this.areas.length;
 
     this.areas.forEach((area, id) => {
+      area.minWidth = this.minSize;
       area.order = id * 2;
       area.basis = `calc((100% - ${this.splitSize * (aCount  - 1)}px) / ${aCount})`;
     });
   }
 
   dragStart($event) {
+    this._inMove = ($event - 1) / 2;
     this._moveLn = this._renderer.listen('document', 'mousemove', this.move.bind(this));
     this._downLn = this._renderer.listen('document', 'mouseup', this.dragEnd.bind(this));
-    this._inMove = ($event - 1) / 2;
   }
 
   move(e) {
     let {x, y} = e;
     const areas = this.areas.toArray();
-    const leftAreaEl = areas[this._inMove];
-    const rightAreaEl = areas[this._inMove + 1];
+    const areaA = areas[this._inMove];
+    const areaB = areas[this._inMove + 1];
+    const splitEl = this.splitters.toArray()[this._inMove];
     const {left, top, width, height} = this.container.nativeElement.getBoundingClientRect();
 
     x -= left;
@@ -73,20 +78,58 @@ export class SplitComponent implements AfterViewInit, AfterContentInit {
     y = y > height ? height : y;
 
     if (this.direction === 'horizontal') {
-      const leftEdge = leftAreaEl.elementRef.nativeElement.getBoundingClientRect().right;
+      const leftEdge = areaA.elementRef.nativeElement.getBoundingClientRect().right;
       const delta = leftEdge - x;
-      const leftWidth = leftAreaEl.elementRef.nativeElement.getBoundingClientRect().width - delta;
-      const rightWidth = rightAreaEl.elementRef.nativeElement.getBoundingClientRect().width + delta;
+      const leftWidth = areaA.elementRef.nativeElement.getBoundingClientRect().width - delta;
+      const rightWidth = areaB.elementRef.nativeElement.getBoundingClientRect().width + delta;
 
-      this._renderer.setStyle(leftAreaEl.elementRef.nativeElement, 'flexBasis', `${leftWidth}px`);
-      this._renderer.setStyle(rightAreaEl.elementRef.nativeElement, 'flexBasis', `${rightWidth}px`);
+      if (leftWidth < this.minSize || rightWidth < this.minSize) {
+        this._renderer.addClass(splitEl.elementRef.nativeElement, 'error');
+        return;
+      } else {
+        this._renderer.removeClass(splitEl.elementRef.nativeElement, 'error');
+      }
+
+      this.setStyles(areaA.elementRef.nativeElement, {
+        flexBasis: `${leftWidth}px`,
+        width: `${leftWidth}px`
+      });
+      this.setStyles(areaB.elementRef.nativeElement, {
+        flexBasis: `${rightWidth}px`,
+        width: `${rightWidth}px`
+      });
     } else {
-      console.log(y);
+      const bottomEdge = areaA.elementRef.nativeElement.getBoundingClientRect().bottom;
+      const delta = bottomEdge - y;
+      const leftBottom = areaA.elementRef.nativeElement.getBoundingClientRect().height - delta;
+      const rightBottom = areaB.elementRef.nativeElement.getBoundingClientRect().height + delta;
+
+      if (leftBottom < this.minSize || rightBottom < this.minSize) {
+        this._renderer.addClass(splitEl.elementRef.nativeElement, 'error');
+        return;
+      } else {
+        this._renderer.removeClass(splitEl.elementRef.nativeElement, 'error');
+      }
+
+      this.setStyles(areaA.elementRef.nativeElement, {
+        flexBasis: `${leftBottom}px`,
+        height: `${rightBottom}px`
+      });
+      this.setStyles(areaB.elementRef.nativeElement, {
+        flexBasis: `${rightBottom}px`,
+        height: `${rightBottom}px`
+      });
     }
   }
 
   dragEnd() {
     this._moveLn();
     this._downLn();
+  }
+
+  private setStyles(el, styles: Object) {
+    for (const style in styles) {
+      this._renderer.setStyle(el, style, styles[style]);
+    }
   }
 }

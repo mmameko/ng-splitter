@@ -1,4 +1,4 @@
-import {Directive, HostBinding, Input, OnInit, Sanitizer} from '@angular/core';
+import {Directive, ElementRef, HostBinding, Input, OnInit, Sanitizer} from '@angular/core';
 
 @Directive({
   selector: '[splitter]'
@@ -15,9 +15,7 @@ export class SplitterDirective implements OnInit {
     return this.dir === 'horizontal' ? `` : `${this.size}px`;
   }
 
-  constructor(private _sanitize: Sanitizer) {}
+  constructor(public elementRef: ElementRef) {}
 
-  ngOnInit() {
-    console.log(this.dir === 'horizontal');
-  }
+  ngOnInit() {}
 }
